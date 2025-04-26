@@ -1,21 +1,49 @@
 const express = require('express');
-const path = require('path');
-const indexRouter = require('./routes/index');
+const bodyParser = require('body-parser');
+const Stripe = require('stripe');
 
 const app = express();
-const PORT = 3000;
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2022-11-15",
+});
 
-// Serve static files from the "public" directory
-app.use(express.static(path.join(__dirname, 'public')));
+// Stripe requires raw body, not JSON
+app.use(bodyParser.raw({ type: "application/json" }));
 
-// Use the router for handling routes
-app.use('/', indexRouter);
+// Webhook endpoint to listen to Stripe
+app.post("/webhook", async (req, res) => {
+  const sig = req.headers["stripe-signature"];
 
-// Catch-all route for handling 404 errors
-app.use((req, res, next) => {
-    res.status(404).sendFile(path.join(__dirname, 'views', '404.html'));
-  });
+  let event;
 
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.error("Webhook signature verification failed:", err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle checkout session completion
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object;
+    console.log("✅ Payment received!");
+    console.log("Customer email:", session.customer_email);
+    console.log("Metadata domain:", session.metadata.domain);
+  }
+
+  res.json({ received: true });
+});
+
+// Root route
+app.get("/", (req, res) => {
+  res.send("Hello from KaiSec Backend 🚀");
+});
+
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}/`);
+  console.log(`Server running on port ${PORT}`);
 });
