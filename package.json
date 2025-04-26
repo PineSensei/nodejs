@@ -6,7 +6,7 @@
   "author": "alphasec",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
     "stripe": "^12.11.0"
   },
   "scripts": {
